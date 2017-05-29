@@ -16,6 +16,7 @@ encoder_model = models.Encoder(
 )
 
 model = models.DualEncoder(encoder_model)
+model.cuda()
 
 loss_fn = torch.nn.BCELoss()
 
@@ -30,17 +31,17 @@ for i in range(num_epochs):
   loss = 0
 
   batch = data.get_batch(i, batch_size)
-  batch = map(preprocessing.process_train, batch)
+  batch = list(map(preprocessing.process_train, batch))
   for c,r,y in batch:
     # Forward pass: compute predicted y by passing x to model
     c = torch.from_numpy(np.array(c))
     r = torch.from_numpy(np.array(r))
     y = torch.from_numpy(np.array([[y]])).float()
 
-    y_pred = model(Variable(c), Variable(r))
+    y_pred = model(Variable(c).cuda(), Variable(r).cuda())
 
     # Compute and add loss
-    loss += loss_fn(y_pred, Variable(y))
+    loss += loss_fn(y_pred, Variable(y).cuda())
 
   print(i, loss.data[0])
 

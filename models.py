@@ -24,7 +24,7 @@ class Encoder(nn.Module):
     self.num_layers = num_layers
     self.rnn_type = rnn_type
 
-    self.embedding = nn.Embedding(vocab_size, input_size)
+    self.embedding = nn.Embedding(vocab_size, input_size, sparse=False)
 
     if rnn_type == 'gru':
       self.rnn = nn.GRU(
@@ -58,7 +58,7 @@ class DualEncoder(nn.Module):
         self.encoder.hidden_size,
       ).type(dtype), 
       requires_grad=True,
-    )
+    ).cuda()
 
   def forward(self, context, response):
     context_hiddens = []
