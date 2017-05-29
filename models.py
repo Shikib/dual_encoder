@@ -3,8 +3,8 @@ import torch
 from torch import nn
 from torch.autograd import Variable
 
-dtype = torch.FloatTensor
-# dtype = torch.cuda.FloatTensor # Uncomment this to run on GPU
+#dtype = torch.FloatTensor
+dtype = torch.cuda.FloatTensor # Uncomment this to run on GPU
 
 class Encoder(nn.Module):
   def __init__(

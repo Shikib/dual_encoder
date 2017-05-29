@@ -32,9 +32,9 @@ for i in range(num_epochs):
 
   batch = data.get_batch(i, batch_size)
   batch = list(map(preprocessing.process_train, batch))
-  i = 0
+  count = 0
   for c,r,y in batch:
-    i += 1
+    count += 1
 
     # Forward pass: compute predicted y by passing x to model
     c = torch.from_numpy(np.array(c))
@@ -44,7 +44,7 @@ for i in range(num_epochs):
     y_pred = model(Variable(c).cuda(), Variable(r).cuda())
 
     # Compute and add loss
-    if i != len(batch):
+    if count != len(batch):
       loss += loss_fn(y_pred, Variable(y).cuda()).data[0]
     else:
       loss += loss_fn(y_pred, Variable(y).cuda())
@@ -61,6 +61,8 @@ for i in range(num_epochs):
 
   # Calling the step function on an Optimizer makes an update to its parameters
   optimizer.step()
+
+  del loss, y_pred, batch
   import pdb; pdb.set_trace()
 
 import pdb; pdb.set_trace()
