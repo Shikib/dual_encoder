@@ -33,7 +33,7 @@ class Encoder(nn.Module):
         num_layers=num_layers,
         dropout=dropout,
         bidirectional=bidirectional,
-      )
+      ).cuda()
     else:
       self.rnn = nn.LSTM(
         input_size,
@@ -41,12 +41,15 @@ class Encoder(nn.Module):
         num_layers=num_layers,
         dropout=dropout,
         bidirectional=bidirectional,
-      )
+      ).cuda()
 
   def forward(self, inp, hidden):
-    emb = self.embedding(inp).view(1, 1, self.input_size)
+    emb = self.embedding(inp).view(len(inp), 1, self.input_size)
     output, hidden = self.rnn(emb, hidden)
     return output, hidden
+
+def detach_all(var):
+  return [e.detach() for e in var]
 
 class DualEncoder(nn.Module):
   def __init__(self, encoder):
@@ -61,17 +64,23 @@ class DualEncoder(nn.Module):
     ).cuda()
 
   def forward(self, context, response):
-    context_hiddens = []
-    context_h = None
-    for word in context:
-      context_o, context_h = self.encoder(word, context_h)
-      context_hiddens.append(context_h)
+    context_o, context_h = self.encoder(context, None)
+    #import pdb; pdb.set_trace()
+    #context_hiddens = []
+    #context_h = None
+    #for word in context:
+    #  context_h = detach_all(context_h) if context_h is not None else context_h
+    #  context_o, context_h = self.encoder(word, context_h)
+    #  #context_hiddens.append(context_h)
 
-    response_hiddens = []
-    response_h = None
-    for word in response:
-      response_o, response_h = self.encoder(word, response_h)
-      response_hiddens.append(response_h)
+    response_o, response_h = self.encoder(response, None)
+
+    #response_hiddens = []
+    #response_h = None
+    #for word in response:
+    #  response_h = detach_all(response_h) if response_h is not None else response_h
+    #  response_o, response_h = self.encoder(word, response_h)
+    #  #response_hiddens.append(response_h)
 
     if self.encoder.rnn_type == 'lstm':
       context_h = context_h[0]
