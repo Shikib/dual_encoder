@@ -1,3 +1,5 @@
+import datetime
+import time
 import torch
 
 from torch import nn
@@ -24,7 +26,7 @@ class Encoder(nn.Module):
     self.num_layers = num_layers
     self.rnn_type = rnn_type
 
-    self.embedding = nn.Embedding(vocab_size, input_size, sparse=False)
+    self.embedding = nn.Embedding(vocab_size, input_size, sparse=False, padding_idx=0)
 
     if rnn_type == 'gru':
       self.rnn = nn.GRU(
@@ -33,6 +35,7 @@ class Encoder(nn.Module):
         num_layers=num_layers,
         dropout=dropout,
         bidirectional=bidirectional,
+        batch_first=True,
       ).cuda()
     else:
       self.rnn = nn.LSTM(
@@ -41,12 +44,13 @@ class Encoder(nn.Module):
         num_layers=num_layers,
         dropout=dropout,
         bidirectional=bidirectional,
+        batch_first=True,
       ).cuda()
 
-  def forward(self, inp, hidden):
-    emb = self.embedding(inp).view(len(inp), 1, self.input_size)
-    output, hidden = self.rnn(emb, hidden)
-    return output, hidden
+  def forward(self, inps):
+    embs = self.embedding(inps)
+    outputs, hiddens = self.rnn(embs)
+    return outputs, hiddens
 
 def detach_all(var):
   return [e.detach() for e in var]
@@ -63,31 +67,26 @@ class DualEncoder(nn.Module):
       requires_grad=True,
     ).cuda()
 
-  def forward(self, context, response):
-    context_o, context_h = self.encoder(context, None)
-    #import pdb; pdb.set_trace()
-    #context_hiddens = []
-    #context_h = None
-    #for word in context:
-    #  context_h = detach_all(context_h) if context_h is not None else context_h
-    #  context_o, context_h = self.encoder(word, context_h)
-    #  #context_hiddens.append(context_h)
-
-    response_o, response_h = self.encoder(response, None)
-
-    #response_hiddens = []
-    #response_h = None
-    #for word in response:
-    #  response_h = detach_all(response_h) if response_h is not None else response_h
-    #  response_o, response_h = self.encoder(word, response_h)
-    #  #response_hiddens.append(response_h)
+  def forward(self, contexts, responses):
+    #print("start", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S.%f'))
+    context_os, context_hs = self.encoder(contexts)
+    #print("context", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S.%f'))
+    response_os, response_hs = self.encoder(responses)
+    #print("response", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S.%f'))
 
     if self.encoder.rnn_type == 'lstm':
-      context_h = context_h[0]
-      response_h = response_h[0]
+      context_hs = context_hs[0]
+      response_hs = response_hs[0]
 
-    context_h = context_h.view(1, self.encoder.hidden_size)
-    response_h = response_h.view(self.encoder.hidden_size, 1)
-    ans = torch.mm(torch.mm(context_h, self.M), response_h)
+    results = []
+    for i in range(len(context_hs[0])):
+      context_h = context_hs[0][i].view(1, self.encoder.hidden_size)
+      response_h = response_hs[0][i].view(self.encoder.hidden_size, 1)
 
-    return torch.sigmoid(ans)
+      ans = torch.mm(torch.mm(context_h, self.M), response_h)[0][0]
+      results.append(torch.sigmoid(ans))
+
+    results = torch.stack(results)
+    #print("multiplies", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S.%f'))
+
+    return results

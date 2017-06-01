@@ -3,6 +3,7 @@ from torch.autograd import Variable
 
 import data
 import datetime
+import evaluate
 import models
 import numpy as np
 import preprocessing
@@ -27,6 +28,7 @@ loss_fn.cuda()
 learning_rate = 0.001
 num_epochs = 30000
 batch_size = 100
+evaluate_batch_size = 250
 
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -47,27 +49,66 @@ for i in range(num_epochs):
   #print("Batch preprocessing done", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
 
   count = 0
+
+  cs = []
+  rs = []
+  ys = []
+
   for c,r,y in batch:
     count += 1
 
     # Forward pass: compute predicted y by passing x to model
-    c = torch.from_numpy(np.array(c))
-    r = torch.from_numpy(np.array(r))
-    y = torch.from_numpy(np.array([[y]])).float()
+    cs.append(torch.LongTensor(c))
+    #print("c", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S.%f'))
+    rs.append(torch.LongTensor(r))
+    #print("r", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S.%f'))
+    ys.append(torch.FloatTensor([y]))
+    #print("y", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S.%f'))
 
-    y_pred = model(Variable(c).cuda(), Variable(r).cuda())
+  cs = Variable(torch.stack(cs, 0)).cuda()
+  rs = Variable(torch.stack(rs, 0)).cuda()
+  ys = Variable(torch.stack(ys, 0)).cuda()
 
-    # Compute and add loss
-    if count != len(batch):
-      loss += loss_fn(y_pred, Variable(y).cuda()).data[0]
-    else:
-      loss += loss_fn(y_pred, Variable(y).cuda())
+  y_preds = model(cs, rs)
+  #print("y_preds", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S.%f'))
+ 
+  loss += loss_fn(y_preds, ys)
+  #print("loss", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S.%f'))
 
-    del y_pred, c, r, y
 
   #print("Batch forward done", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
 
-  print(i, loss.data[0])
+  if i % 100 == 0:
+    print(i, datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
+    print(i, loss.data[0])
+
+  if i > 0 and i % 1000 == 0:
+    res = evaluate.evaluate(model, size=evaluate_batch_size)
+    print(i)
+    print("1in10: %0.2f, 2 in 10: %0.2f, 5 in 10: %0.2f" % (
+      res[0]/evaluate_batch_size,
+      sum(res[:2])/evaluate_batch_size,
+      sum(res[:5])/evaluate_batch_size,
+    ))
+
+  if i % 10000 == 0 and i > 0:
+    res = evaluate.evaluate(model, size=2000)
+     
+    one_in = res[0]/2000
+    two_in = sum(res[:2])/2000
+    three_in = sum(res[:5])/2000
+
+    print("!!!!!!!!!!")
+    print("1in10: %0.2f, 2 in 10: %0.2f, 5 in 10: %0.2f" % (
+      one_in,
+      two_in,
+      three_in,
+    ))
+    print(res)
+
+    if one_in > 0.45:
+      import pdb; pdb.set_trace()
+
 
   # Before the backward pass, use the optimizer object to zero all of the
   # gradients for the variables it will update (which are the learnable weights
