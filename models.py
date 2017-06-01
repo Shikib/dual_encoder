@@ -1,3 +1,4 @@
+import preprocessing 
 import datetime
 import time
 import torch
@@ -22,6 +23,7 @@ class Encoder(nn.Module):
   ):
     super(Encoder, self).__init__()
     self.num_directions = 2 if bidirectional else 1
+    self.vocab_size = vocab_size
     self.input_size = input_size
     self.hidden_size = hidden_size // self.num_directions
     self.num_layers = num_layers
@@ -59,6 +61,15 @@ class Encoder(nn.Module):
     init.orthogonal(self.rnn.weight_ih_l0)
     init.uniform(self.rnn.weight_hh_l0, a=-0.01, b=0.01)
 
+    glove_embeddings = preprocessing.load_glove_embeddings()
+    embedding_weights = torch.FloatTensor(self.vocab_size, self.input_size)
+    init.uniform(embedding_weights, a=-0.25, b=0.25)
+    for k,v in glove_embeddings.items():
+      embedding_weights[k] = torch.FloatTensor(v)
+    embedding_weights[0] = torch.FloatTensor([0]*self.input_size)
+    del self.embedding.weight
+    self.embedding.weight = nn.Parameter(embedding_weights)
+
 def detach_all(var):
   return [e.detach() for e in var]
 
@@ -66,11 +77,10 @@ class DualEncoder(nn.Module):
   def __init__(self, encoder):
     super(DualEncoder, self).__init__()
     self.encoder = encoder
+    M = torch.FloatTensor(self.encoder.hidden_size, self.encoder.hidden_size)
+    init.normal(M)
     self.M = Variable(
-      torch.randn(
-        self.encoder.hidden_size, 
-        self.encoder.hidden_size,
-      ).type(dtype), 
+      M,
       requires_grad=True,
     ).cuda()
 

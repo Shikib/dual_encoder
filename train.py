@@ -25,7 +25,7 @@ model.cuda()
 loss_fn = torch.nn.BCELoss()
 loss_fn.cuda()
 
-learning_rate = 0.001
+learning_rate = 0.01
 num_epochs = 30000
 batch_size = 100
 evaluate_batch_size = 250
@@ -81,8 +81,10 @@ for i in range(num_epochs):
   if i % 100 == 0:
     print(i, datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
     print(i, loss.data[0])
+    import pdb; pdb.set_trace()
 
   if i % 1000 == 0:
+    import pdb; pdb.set_trace()
     res = evaluate.evaluate(model, size=evaluate_batch_size)
     print(i)
     print("1in10: %0.2f, 2 in 10: %0.2f, 5 in 10: %0.2f" % (
@@ -90,6 +92,7 @@ for i in range(num_epochs):
       sum(res[:2])/evaluate_batch_size,
       sum(res[:5])/evaluate_batch_size,
     ))
+    print(res)
 
   if i % 10000 == 0 and i > 0:
     res = evaluate.evaluate(model, size=2000)
