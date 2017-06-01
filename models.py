@@ -3,6 +3,7 @@ import time
 import torch
 
 from torch import nn
+from torch.nn import init
 from torch.autograd import Variable
 
 #dtype = torch.FloatTensor
@@ -47,10 +48,16 @@ class Encoder(nn.Module):
         batch_first=True,
       ).cuda()
 
+    self.init_weights()
+
   def forward(self, inps):
     embs = self.embedding(inps)
     outputs, hiddens = self.rnn(embs)
     return outputs, hiddens
+
+  def init_weights(self):
+    init.orthogonal(self.rnn.weight_ih_l0)
+    init.uniform(self.rnn.weight_hh_l0, a=-0.01, b=0.01)
 
 def detach_all(var):
   return [e.detach() for e in var]

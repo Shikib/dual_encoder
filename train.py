@@ -82,7 +82,7 @@ for i in range(num_epochs):
     print(i, datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
     print(i, loss.data[0])
 
-  if i > 0 and i % 1000 == 0:
+  if i % 1000 == 0:
     res = evaluate.evaluate(model, size=evaluate_batch_size)
     print(i)
     print("1in10: %0.2f, 2 in 10: %0.2f, 5 in 10: %0.2f" % (
@@ -121,6 +121,8 @@ for i in range(num_epochs):
   loss.backward()
 
   #print("Loss backward done", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
+
+  torch.nn.utils.clip_grad_norm(model.parameters(), 10)
 
   # Calling the step function on an Optimizer makes an update to its parameters
   optimizer.step()

@@ -16,15 +16,12 @@ def evaluate(model, size=None):
   for e in valid:
     context, response, distractors = e
     
-    c = Variable(torch.from_numpy(np.array(context)), volatile=True).cuda()
-    r = Variable(torch.from_numpy(np.array(response)), volatile=True).cuda()
+    cs = Variable(torch.stack([torch.LongTensor(context) for i in range(10)], 0), volatile=True).cuda()
+    rs = [torch.LongTensor(response)]
+    rs += [torch.LongTensor(distractor) for distractor in distractors]
+    rs = Variable(torch.stack(rs, 0), volatile=True).cuda()
     
-    results = [model(c, r)]
-    for dist in distractors:
-      d = Variable(torch.from_numpy(np.array(dist)), volatile=True).cuda()
-      results.append(model(c, d))
-      
-    results = [e.data.cpu().numpy()[0,0] for e in results]
+    results = [e.data.cpu().numpy()[0] for e in model(cs, rs)]
 
     better_count = sum(1 for val in results[1:] if val >= results[0])
     count[better_count] += 1
