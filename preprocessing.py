@@ -19,9 +19,10 @@ def load_glove_embeddings(filename='data/glove.6B.100d.txt'):
   return embeddings
   
 def numberize(inp):
+  inp = inp.split()
   result = list(map(lambda k: vocab.get(k, 0), inp))[-160:]
   if len(result) < 160:
-    result += [0]*(160 - len(result))
+    result = [0]*(160 - len(result)) + result
 
   return result
 

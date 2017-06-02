@@ -25,9 +25,9 @@ model.cuda()
 loss_fn = torch.nn.BCELoss()
 loss_fn.cuda()
 
-learning_rate = 0.01
+learning_rate = 0.001
 num_epochs = 30000
-batch_size = 100
+batch_size = 128
 evaluate_batch_size = 250
 
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -36,9 +36,6 @@ optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 for i in range(num_epochs):
 
   #print("Starting new example", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
-
-  # Compute loss
-  loss = 0
 
   batch = data.get_batch(i, batch_size)
 
@@ -72,19 +69,19 @@ for i in range(num_epochs):
   y_preds = model(cs, rs)
   #print("y_preds", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S.%f'))
  
-  loss += loss_fn(y_preds, ys)
+  # Compute loss
+  loss = loss_fn(y_preds, ys)
   #print("loss", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S.%f'))
 
 
   #print("Batch forward done", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
 
-  if i % 100 == 0:
+  if i % 100 == 1:
+    print(y_preds,ys)
     print(i, datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
     print(i, loss.data[0])
-    import pdb; pdb.set_trace()
 
   if i % 1000 == 0:
-    import pdb; pdb.set_trace()
     res = evaluate.evaluate(model, size=evaluate_batch_size)
     print(i)
     print("1in10: %0.2f, 2 in 10: %0.2f, 5 in 10: %0.2f" % (
@@ -123,9 +120,15 @@ for i in range(num_epochs):
   # Backward pass: compute gradient of the loss with respect to model parameters
   loss.backward()
 
+  #print("M grad",model.M.grad)
+  #print("emb grad",model.encoder.embedding.weight.grad)
+  #print("hh grad",model.encoder.rnn.weight_hh_l0.grad)
+  #print("ih grad",model.encoder.rnn.weight_ih_l0.grad)
+
   #print("Loss backward done", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
 
-  torch.nn.utils.clip_grad_norm(model.parameters(), 10)
+  #torch.nn.utils.clip_grad_norm(model.parameters(), 10)
+  #torch.nn.utils.clip_grad_norm([model.M], 10)
 
   # Calling the step function on an Optimizer makes an update to its parameters
   optimizer.step()

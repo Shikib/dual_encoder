@@ -3,6 +3,7 @@ import random
 
 reader = csv.reader(open('data/train.csv'))
 rows = list(reader)[1:]
+random.shuffle(rows)
 
 def get_batch(epoch, batch_size):
   start = epoch * batch_size % len(rows)

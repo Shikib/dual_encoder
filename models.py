@@ -70,16 +70,13 @@ class Encoder(nn.Module):
     del self.embedding.weight
     self.embedding.weight = nn.Parameter(embedding_weights)
 
-def detach_all(var):
-  return [e.detach() for e in var]
-
 class DualEncoder(nn.Module):
   def __init__(self, encoder):
     super(DualEncoder, self).__init__()
     self.encoder = encoder
     M = torch.FloatTensor(self.encoder.hidden_size, self.encoder.hidden_size)
     init.normal(M)
-    self.M = Variable(
+    self.M = nn.Parameter(
       M,
       requires_grad=True,
     ).cuda()
