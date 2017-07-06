@@ -21,7 +21,8 @@ def evaluate(model, size=None):
     rs += [torch.LongTensor(distractor) for distractor in distractors]
     rs = Variable(torch.stack(rs, 0), volatile=True).cuda()
     
-    results = [e.data.cpu().numpy()[0] for e in model(cs, rs)]
+    results, responses = model(cs, rs, [context for i in range(10)])
+    results = [e.data.cpu().numpy()[0] for e in results]
 
     better_count = sum(1 for val in results[1:] if val >= results[0])
     count[better_count] += 1

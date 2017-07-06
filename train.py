@@ -12,7 +12,7 @@ import torch
 
 encoder_model = models.Encoder(
   input_size=100, # embedding dim 
-  hidden_size=256, # rnn dim
+  hidden_size=300, # rnn dim
   vocab_size=91620, # vocab size
   bidirectional=False, # really should change!
   rnn_type='lstm',
@@ -21,14 +21,30 @@ encoder_model.cuda()
 
 model = models.DualEncoder(encoder_model)
 model.cuda()
+#t_model = torch.load("SAVED_MODEL")
+#
+#model.encoder.load_state_dict(t_model.encoder.state_dict())
+#model.M = t_model.M
+#model.W = t_model.M
+#
+#del t_model
+#import pdb; pdb.set_trace()
+#for parameter in model.parameters():
+#  parameter.requires_grad = False
+#import pdb; pdb.set_trace()
+
 
 loss_fn = torch.nn.BCELoss()
 loss_fn.cuda()
 
 learning_rate = 0.001
 num_epochs = 30000
-batch_size = 128
+batch_size = 512
 evaluate_batch_size = 250
+
+#for param in model.parameters():
+#  param.requires_grad = False
+#model.W.requires_grad = True
 
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -51,6 +67,7 @@ for i in range(num_epochs):
   rs = []
   ys = []
 
+  contexts = []
   for c,r,y in batch:
     count += 1
 
@@ -62,11 +79,13 @@ for i in range(num_epochs):
     ys.append(torch.FloatTensor([y]))
     #print("y", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S.%f'))
 
+    contexts.append(c)
+
   cs = Variable(torch.stack(cs, 0)).cuda()
   rs = Variable(torch.stack(rs, 0)).cuda()
   ys = Variable(torch.stack(ys, 0)).cuda()
 
-  y_preds = model(cs, rs)
+  y_preds, responses = model(cs, rs, contexts)
   #print("y_preds", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S.%f'))
  
   # Compute loss
@@ -76,12 +95,10 @@ for i in range(num_epochs):
 
   #print("Batch forward done", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
 
-  if i % 100 == 1:
-    print(y_preds,ys)
-    print(i, datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
+  if i % 10 == 0:
     print(i, loss.data[0])
 
-  if i % 1000 == 0:
+  if i % 100 == 0: 
     res = evaluate.evaluate(model, size=evaluate_batch_size)
     print(i)
     print("1in10: %0.2f, 2 in 10: %0.2f, 5 in 10: %0.2f" % (
@@ -91,7 +108,7 @@ for i in range(num_epochs):
     ))
     print(res)
 
-  if i % 10000 == 0 and i > 0:
+  if i % 1000 == 0 and i > 0:
     res = evaluate.evaluate(model, size=2000)
      
     one_in = res[0]/2000
@@ -106,10 +123,10 @@ for i in range(num_epochs):
     ))
     print(res)
 
-    if one_in > 0.45:
+    if one_in > 0.55:
       import pdb; pdb.set_trace()
 
-
+  #print("!")
   # Before the backward pass, use the optimizer object to zero all of the
   # gradients for the variables it will update (which are the learnable weights
   # of the model)

@@ -1,3 +1,6 @@
+import nltk
+from nltk.stem import SnowballStemmer
+
 def load_vocab(filename):
   lines = open(filename).readlines()
   return {
@@ -5,7 +8,7 @@ def load_vocab(filename):
     for i,word in enumerate(lines)
   }
 
-vocab = load_vocab('data/vocabulary.txt')
+vocab = load_vocab('/home/ubuntu/dual_encoder/data/vocabulary.txt')
 
 def load_glove_embeddings(filename='data/glove.6B.100d.txt'):
   lines = open(filename).readlines()
@@ -48,3 +51,9 @@ def process_valid(row):
   ]
 
   return context, response, distractors
+
+stemmer = SnowballStemmer("english")
+def process_predict_embed(response):
+  response = ' '.join(list(map(stemmer.stem, nltk.word_tokenize(response))))
+  response = numberize(response) 
+  return response
