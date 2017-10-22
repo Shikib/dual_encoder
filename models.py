@@ -4,11 +4,79 @@ import time
 import torch
 
 from torch import nn
-from torch.nn import init
 from torch.autograd import Variable
+from torch.nn import init
+import torch.nn.functional as F
 
 #dtype = torch.FloatTensor
 dtype = torch.cuda.FloatTensor # Uncomment this to run on GPU
+
+class CNNEncoder(nn.Module):
+  def __init__(
+    self,
+    emb_dim,
+    vocab_size,
+    kernel_sizes=[(1,300),(2,100),(3,100)],
+    dropout_prob=0.5,
+  ):
+    super(CNNEncoder, self).__init__()
+    self.embed = nn.Embedding(vocab_size, emb_dim)
+    self.convs = nn.ModuleList([
+      nn.Conv2d(1, num_filters, (k_size, emb_dim))
+      for k_size,num_filters in kernel_sizes
+    ])
+    self.dropout = nn.Dropout(dropout_prob)
+
+  def forward(self, x):
+    x = self.embed(x) # batch_size x seq_len x emb_dim
+    x = x.unsqueeze(1) # batch_size x 1 x seq_len x emb_dim
+    x = [
+      F.relu(conv(x)).squeeze(3) for conv in self.convs
+    ] # [ batch_size x filter_size x seq_len ] x len(kernel_sizes)
+    x = [
+      F.max_pool1d(v, v.size(2)).squeeze(2) for v in x
+    ] # [ batch_size x filter_size ] x len(kernel_sizes)
+    x = torch.cat(x, 1) # batch_size x (filter_size * kernel_sizes)
+    x = self.dropout(x)
+    return x
+
+  def init_weights(self):
+    glove_embeddings = preprocessing.load_glove_embeddings()
+    embedding_weights = torch.FloatTensor(self.vocab_size, self.input_size)
+    init.uniform(embedding_weights, a=-0.25, b=0.25)
+    for k,v in glove_embeddings.items():
+      embedding_weights[k] = torch.FloatTensor(v)
+    embedding_weights[0] = torch.FloatTensor([0]*self.input_size)
+    del self.embedding.weight
+    self.embedding.weight = nn.Parameter(embedding_weights)
+
+class CNNClassifier(nn.Module):
+  def __init__(
+    self,
+    encoder,
+    encoder_output_size, # filter_size*len(kernel_sizes)
+    num_classes=2,
+  ):
+    super(CNNClassifier, self).__init__()
+    self.encoder = encoder
+    #M = torch.FloatTensor(encoder_output_size, encoder_output_size).cuda()
+    #init.normal(M)
+    #self.M = nn.Parameter(
+    #  M,
+    #  requires_grad=True,
+    #)
+    self.linear = nn.Linear(2*encoder_output_size, num_classes)
+
+  def forward(self, contexts, responses, contexts2):
+    contexts_encoding = self.encoder(contexts)
+    responses_encoding = self.encoder(responses)
+
+    #expanded_M = self.M.expand((contexts_encoding.size(0), self.M.size(0), self.M.size(1)))
+    #logits = torch.bmm(contexts_encoding.unsqueeze(1), responses_encoding.unsqueeze(2))
+
+    cat_enc = torch.cat((torch.abs(contexts_encoding * responses_encoding), torch.abs(contexts_encoding - responses_encoding)), 1)
+    logits = self.linear(cat_enc)
+    return torch.sigmoid(logits)
 
 class Encoder(nn.Module):
   def __init__(
@@ -140,4 +208,4 @@ class DualEncoder(nn.Module):
     results = torch.stack(results)
     #print("multiplies", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S.%f'))
 
-    return results, response_encodings
+    return results

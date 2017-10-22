@@ -21,19 +21,19 @@ def load_glove_embeddings(filename='data/glove.6B.100d.txt'):
   
   return embeddings
   
-def numberize(inp):
+def numberize(inp, pad_len=100):
   inp = inp.split()
-  result = list(map(lambda k: vocab.get(k, 0), inp))[-160:]
-  if len(result) < 160:
-    result = [0]*(160 - len(result)) + result
+  result = list(map(lambda k: vocab.get(k, 0), inp))[-pad_len:]
+  if len(result) < pad_len:
+    result = [0]*(pad_len - len(result)) + result
 
   return result
 
-def process_train(row):
+def process_train(row, pad_len=100):
   context,response,label = row
 
-  context = numberize(context)
-  response = numberize(response)
+  context = numberize(context, pad_len=pad_len)
+  response = numberize(response, pad_len=pad_len)
   label = int(label)
 
   return context,response,label

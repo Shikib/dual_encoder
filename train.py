@@ -10,17 +10,38 @@ import preprocessing
 import time
 import torch
 
-encoder_model = models.Encoder(
-  input_size=100, # embedding dim 
-  hidden_size=300, # rnn dim
-  vocab_size=91620, # vocab size
-  bidirectional=False, # really should change!
-  rnn_type='lstm',
-)
-encoder_model.cuda()
+torch.backends.cudnn.enabled = False
 
-model = models.DualEncoder(encoder_model)
-model.cuda()
+use_lstm = False
+
+if use_lstm:
+  encoder_model = models.Encoder(
+    input_size=100, # embedding dim 
+    hidden_size=300, # rnn dim
+    vocab_size=91620, # vocab size
+    bidirectional=False, # really should change!
+    rnn_type='lstm',
+  )
+  encoder_model.cuda()
+  
+  model = models.DualEncoder(encoder_model)
+  model.cuda()
+else:
+  encoder_model = models.CNNEncoder(
+    emb_dim=100,
+    vocab_size=91620,
+    kernel_sizes=[(1,300), (2,100), (3,100), (4,100)],
+    dropout_prob=0.5,
+  )
+  encoder_model.cuda()
+
+  model = models.CNNClassifier(
+    encoder=encoder_model,
+    encoder_output_size=300+100+100+100,
+    num_classes=1,
+  )
+  model.cuda()
+    
 #t_model = torch.load("SAVED_MODEL")
 #
 #model.encoder.load_state_dict(t_model.encoder.state_dict())
@@ -39,25 +60,27 @@ loss_fn.cuda()
 
 learning_rate = 0.001
 num_epochs = 30000
-batch_size = 512
+batch_size = 256
 evaluate_batch_size = 250
 
 #for param in model.parameters():
 #  param.requires_grad = False
 #model.W.requires_grad = True
 
+#parameters = [e for e in model.parameters()] + [model.M]
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
 #print("Training started")
 for i in range(num_epochs):
-
-  #print("Starting new example", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
+  print("Starting new example", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
 
   batch = data.get_batch(i, batch_size)
 
+  max_len = max([max(len(e[0].split()), len(e[1].split())) for e in batch])
+
   #print("Get batch", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
 
-  batch = list(map(preprocessing.process_train, batch))
+  batch = [preprocessing.process_train(row, pad_len=min(300,max_len)) for row in  batch]
 
   #print("Batch preprocessing done", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
 
@@ -85,9 +108,9 @@ for i in range(num_epochs):
   rs = Variable(torch.stack(rs, 0)).cuda()
   ys = Variable(torch.stack(ys, 0)).cuda()
 
-  y_preds, responses = model(cs, rs, contexts)
+  y_preds = model(cs, rs, contexts)
   #print("y_preds", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S.%f'))
- 
+
   # Compute loss
   loss = loss_fn(y_preds, ys)
   #print("loss", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S.%f'))
@@ -98,7 +121,7 @@ for i in range(num_epochs):
   if i % 10 == 0:
     print(i, loss.data[0])
 
-  if i % 100 == 0: 
+  if i % 100 == 0 and i > 0: 
     res = evaluate.evaluate(model, size=evaluate_batch_size)
     print(i)
     print("1in10: %0.2f, 2 in 10: %0.2f, 5 in 10: %0.2f" % (
@@ -123,7 +146,7 @@ for i in range(num_epochs):
     ))
     print(res)
 
-    if one_in > 0.55:
+    if one_in > 0.60:
       import pdb; pdb.set_trace()
 
   #print("!")
@@ -144,7 +167,7 @@ for i in range(num_epochs):
 
   #print("Loss backward done", datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
 
-  #torch.nn.utils.clip_grad_norm(model.parameters(), 10)
+  torch.nn.utils.clip_grad_norm(model.parameters(), 10)
   #torch.nn.utils.clip_grad_norm([model.M], 10)
 
   # Calling the step function on an Optimizer makes an update to its parameters
